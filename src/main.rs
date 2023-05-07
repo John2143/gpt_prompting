@@ -1,31 +1,81 @@
+use std::{borrow::Cow, collections::BTreeSet};
+
 use anyhow::bail;
 use async_openai::{Client, types::{CreateChatCompletionRequestArgs, ChatCompletionRequestMessageArgs, Role}};
 
 
+#[derive(serde::Deserialize, Debug)]
+pub struct R {
+    pub artist: String,
+    pub song_name: String,
+    pub description: Option<String>,
+}
+
+/// this can convert indented multiline strings into non-indented strings
+/// see [`space_align_cow`] if your string is 
+pub fn space_align(input: &str) -> String {
+    space_align_cow(input).to_string()
+}
+
+pub fn space_align_cow(input: &str) -> Cow<str> {
+    let mut set = BTreeSet::new();
+    for line in input.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+
+        let diff = line.len() - line.trim_start().len();
+        set.insert(diff);
+    }
+
+    let min_trim = match set.pop_first() {
+        Some(s) => s,
+        None => return Cow::Borrowed(input.trim()),
+    };
+
+
+    // bad performance
+    let new_str = input
+        .lines()
+        .map(|line| {
+            if line.trim().is_empty() {
+                return line;
+            }
+
+            return &line[min_trim..];
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    Cow::Owned(new_str.trim().into())
+}
+
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let songs = "
-NEW MAGIC WAND, Tyler the creator
-Fazers, King Geedorah
-NEVER, JID
-";
-    let p = format!("\
-You are assistant designed to reccomend music. You are given a list of songs, and you should suggest \
-what music should be played next. You should mostly try to recommend new artists. Don't recommend \
-artists that fell off. Fire only.
+    let songs = space_align("
+        NEW MAGIC WAND, Tyler the creator
+        Fazers, King Geedorah
+        NEVER, JID
+    ");
 
-Step 1: Identify the common musical themes in the given songs.
-Step 2: Print a list of a few songs which the user might want to listen to next
+    let p = space_align(&format!("\
+        You are assistant designed to reccomend music.
+        You will be provided with a list of songs delimited by triple backticks.
+        You are given a list of songs, and you should suggest what music should be played next.
+        Don't recommend artists that fell off. Fire only.
 
-The user provided input is between the triple backticks:
-```
-{songs}
-```
+        Step 1: Identify the common musical themes in the given songs.
+        Step 2: Generate a list of 2-4 artists that produce similar songs
+        Step 3: Choose one song from each artist to recommend
+        Step 4: Print the results as a json array with the keys 'artist' and 'song_name'.
 
-Print your response below:
-");
-    let s = send_open_api(p).await?;
+        ```
+        {songs}
+        ```
+    "));
+
+    let s = send_open_api(space_align(&p)).await?;
     println!("{}", s);
 
     Ok(())
@@ -46,7 +96,7 @@ pub async fn send_open_api(content: String) -> anyhow::Result<String> {
         .n(1)
         .temperature(0.2)
         .user("2143")
-        .max_tokens(100u16)
+        .max_tokens(200u16)
         .build()?;
 
     let c = client.chat().create(chat).await?;
