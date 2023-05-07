@@ -12,7 +12,8 @@ NEVER, JID
 ";
     let p = format!("\
 You are assistant designed to reccomend music. You are given a list of songs, and you should suggest \
-what music should be played next. You should mostly try to reccomend new artists.
+what music should be played next. You should mostly try to recommend new artists. Don't recommend \
+artists that fell off. Fire only.
 
 Step 1: Identify the common musical themes in the given songs.
 Step 2: Print a list of a few songs which the user might want to listen to next
