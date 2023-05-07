@@ -61,7 +61,6 @@ async fn main() -> anyhow::Result<()> {
 
     let p = space_align(&format!("\
         You are assistant designed to reccomend music.
-        You will be provided with a list of songs delimited by triple backticks.
         You are given a list of songs, and you should suggest what music should be played next.
         Don't recommend artists that fell off. Fire only.
 
@@ -69,19 +68,15 @@ async fn main() -> anyhow::Result<()> {
         Step 2: Generate a list of 2-4 artists that produce similar songs
         Step 3: Choose one song from each artist to recommend
         Step 4: Print the results as a json array with the keys 'artist' and 'song_name'.
-
-        ```
-        {songs}
-        ```
     "));
 
-    let s = send_open_api(space_align(&p)).await?;
+    let s = send_open_api(p, songs).await?;
     println!("{}", s);
 
     Ok(())
 }
 
-pub async fn send_open_api(content: String) -> anyhow::Result<String> {
+pub async fn send_open_api(system: String, user: String) -> anyhow::Result<String> {
     let client = Client::new();
 
 
@@ -89,8 +84,12 @@ pub async fn send_open_api(content: String) -> anyhow::Result<String> {
         .model("gpt-3.5-turbo")
         .messages(vec![
             ChatCompletionRequestMessageArgs::default()
+                .role(Role::System)
+                .content(system)
+                .build()?,
+            ChatCompletionRequestMessageArgs::default()
                 .role(Role::User)
-                .content(content)
+                .content(user)
                 .build()?,
         ])
         .n(1)
